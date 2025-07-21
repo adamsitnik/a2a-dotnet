@@ -26,7 +26,7 @@ public sealed class A2AClient : IA2AClient
     /// <inheritdoc />
     public Task<A2AResponse> SendMessageAsync(MessageSendParams taskSendParams, CancellationToken cancellationToken = default) =>
         SendRpcRequestAsync(
-            taskSendParams,
+            taskSendParams ?? throw new ArgumentNullException(nameof(taskSendParams)),
             A2AMethods.MessageSend,
             A2AJsonUtilities.JsonContext.Default.MessageSendParams,
             A2AJsonUtilities.JsonContext.Default.A2AResponse,
@@ -35,7 +35,7 @@ public sealed class A2AClient : IA2AClient
     /// <inheritdoc />
     public Task<AgentTask> GetTaskAsync(string taskId, CancellationToken cancellationToken = default) =>
         SendRpcRequestAsync(
-            new() { Id = taskId },
+            new() { Id = string.IsNullOrEmpty(taskId) ? throw new ArgumentNullException(nameof(taskId)) : taskId },
             A2AMethods.TaskGet,
             A2AJsonUtilities.JsonContext.Default.TaskIdParams,
             A2AJsonUtilities.JsonContext.Default.AgentTask,
@@ -44,7 +44,7 @@ public sealed class A2AClient : IA2AClient
     /// <inheritdoc />
     public Task<AgentTask> CancelTaskAsync(TaskIdParams taskIdParams, CancellationToken cancellationToken = default) =>
         SendRpcRequestAsync(
-            taskIdParams,
+            taskIdParams ?? throw new ArgumentNullException(nameof(taskIdParams)),
             A2AMethods.TaskCancel,
             A2AJsonUtilities.JsonContext.Default.TaskIdParams,
             A2AJsonUtilities.JsonContext.Default.AgentTask,
@@ -53,25 +53,25 @@ public sealed class A2AClient : IA2AClient
     /// <inheritdoc />
     public Task<TaskPushNotificationConfig> SetPushNotificationAsync(TaskPushNotificationConfig pushNotificationConfig, CancellationToken cancellationToken = default) =>
         SendRpcRequestAsync(
-            pushNotificationConfig,
-            "task/pushNotification/set",
+            pushNotificationConfig ?? throw new ArgumentNullException(nameof(pushNotificationConfig)),
+            A2AMethods.TaskPushNotificationConfigSet,
             A2AJsonUtilities.JsonContext.Default.TaskPushNotificationConfig,
             A2AJsonUtilities.JsonContext.Default.TaskPushNotificationConfig,
             cancellationToken);
 
     /// <inheritdoc />
-    public Task<TaskPushNotificationConfig> GetPushNotificationAsync(TaskIdParams taskIdParams, CancellationToken cancellationToken = default) =>
+    public Task<TaskPushNotificationConfig> GetPushNotificationAsync(GetTaskPushNotificationConfigParams notificationConfigParams, CancellationToken cancellationToken = default) =>
         SendRpcRequestAsync(
-            taskIdParams,
-            "task/pushNotification/get",
-            A2AJsonUtilities.JsonContext.Default.TaskIdParams,
+            notificationConfigParams ?? throw new ArgumentNullException(nameof(notificationConfigParams)),
+            A2AMethods.TaskPushNotificationConfigGet,
+            A2AJsonUtilities.JsonContext.Default.GetTaskPushNotificationConfigParams,
             A2AJsonUtilities.JsonContext.Default.TaskPushNotificationConfig,
             cancellationToken);
 
     /// <inheritdoc />
     public IAsyncEnumerable<SseItem<A2AEvent>> SendMessageStreamAsync(MessageSendParams taskSendParams, CancellationToken cancellationToken = default) =>
         SendRpcSseRequestAsync(
-            taskSendParams,
+            taskSendParams ?? throw new ArgumentNullException(nameof(taskSendParams)),
             A2AMethods.MessageStream,
             A2AJsonUtilities.JsonContext.Default.MessageSendParams,
             A2AJsonUtilities.JsonContext.Default.A2AEvent,
@@ -80,7 +80,7 @@ public sealed class A2AClient : IA2AClient
     /// <inheritdoc />
     public IAsyncEnumerable<SseItem<A2AEvent>> ResubscribeToTaskAsync(string taskId, CancellationToken cancellationToken = default) =>
         SendRpcSseRequestAsync(
-            new() { Id = taskId },
+            new() { Id = string.IsNullOrEmpty(taskId) ? throw new ArgumentNullException(nameof(taskId)) : taskId },
             A2AMethods.TaskResubscribe,
             A2AJsonUtilities.JsonContext.Default.TaskIdParams,
             A2AJsonUtilities.JsonContext.Default.A2AEvent,
@@ -93,6 +93,8 @@ public sealed class A2AClient : IA2AClient
         JsonTypeInfo<TOutput> outputTypeInfo,
         CancellationToken cancellationToken) where TOutput : class
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         using var responseStream = await SendAndReadResponseStream(
             jsonRpcParams,
             method,
@@ -104,7 +106,7 @@ public sealed class A2AClient : IA2AClient
 
         if (responseObject?.Error is { } error)
         {
-            throw new InvalidOperationException($"JSON-RPC error ({error.Code}): {error.Message}");
+            throw new A2AException(error.Message, (A2AErrorCode)error.Code);
         }
 
         return responseObject?.Result?.Deserialize(outputTypeInfo) ??
@@ -133,7 +135,7 @@ public sealed class A2AClient : IA2AClient
 
             if (responseObject?.Error is { } error)
             {
-                throw new InvalidOperationException($"JSON-RPC error ({error.Code}): {error.Message}");
+                throw new A2AException(error.Message, (A2AErrorCode)error.Code);
             }
 
             return JsonSerializer.Deserialize(responseObject?.Result, outputTypeInfo) ??

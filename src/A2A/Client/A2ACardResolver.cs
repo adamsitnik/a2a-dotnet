@@ -26,9 +26,9 @@ public sealed class A2ACardResolver
         string agentCardPath = "/.well-known/agent.json",
         ILogger? logger = null)
     {
-        if (agentCardPath is null)
+        if (string.IsNullOrEmpty(agentCardPath))
         {
-            throw new ArgumentNullException(nameof(agentCardPath), "Agent card path cannot be null.");
+            throw new ArgumentNullException(nameof(agentCardPath), "Agent card path cannot be null or empty.");
         }
 
         _httpClient = httpClient ?? A2AClient.s_sharedClient;
@@ -48,6 +48,8 @@ public sealed class A2ACardResolver
     /// <returns>The agent card.</returns>
     public async Task<AgentCard> GetAgentCardAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (_logger.IsEnabled(LogLevel.Information))
         {
             Debug.Assert(_agentCardPath.IsAbsoluteUri || _httpClient.BaseAddress is not null);
@@ -69,12 +71,12 @@ public sealed class A2ACardResolver
                 ).ConfigureAwait(false);
 
             return JsonSerializer.Deserialize(responseStream, A2AJsonUtilities.JsonContext.Default.AgentCard) ??
-                throw new A2AClientJsonException("Failed to parse agent card JSON.");
+                throw new A2AException("Failed to parse agent card JSON.");
         }
         catch (JsonException ex)
         {
             _logger.LogError(ex, "Failed to parse agent card JSON");
-            throw new A2AClientJsonException($"Failed to parse JSON: {ex.Message}");
+            throw new A2AException($"Failed to parse JSON: {ex.Message}");
         }
         catch (HttpRequestException ex)
         {
@@ -85,7 +87,7 @@ public sealed class A2ACardResolver
                 HttpStatusCode.InternalServerError;
 
             _logger.LogError(ex, "HTTP request failed with status code {StatusCode}", statusCode);
-            throw new A2AClientHTTPException(statusCode, ex.Message);
+            throw new A2AException("HTTP request failed", ex);
         }
     }
 }
