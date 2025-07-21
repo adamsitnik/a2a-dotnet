@@ -444,8 +444,8 @@ internal sealed class A2AEventStreamResult : IResult
             await foreach (var taskEvent in taskEvents)
             {
                 var json = JsonSerializer.Serialize(taskEvent, A2AJsonUtilities.DefaultOptions.GetTypeInfo(typeof(A2AEvent)));
-                await httpContext.Response.BodyWriter.WriteAsync(Encoding.UTF8.GetBytes($"data: {json}\n\n"));
-                await httpContext.Response.BodyWriter.FlushAsync();
+                await httpContext.Response.BodyWriter.WriteAsync(Encoding.UTF8.GetBytes($"data: {json}\n\n"), httpContext.RequestAborted);
+                await httpContext.Response.BodyWriter.FlushAsync(httpContext.RequestAborted);
             }
         }
         catch (OperationCanceledException)
