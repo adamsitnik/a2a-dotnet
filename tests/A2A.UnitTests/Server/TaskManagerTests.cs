@@ -19,37 +19,37 @@ public class TaskManagerTests
         Assert.Equal("Hello, World!", messageReceived);
     }
 
-    [Fact]
-    public async Task OnMessageReceivedCanReturnTaskOrMessage()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task OnMessageReceivedCanReturnTaskOrMessage(bool stream)
     {
         TaskManager taskManager = new();
         var firstMessage = CreateMessageSendParams("I need something fancy.");
         var secondMessage = CreateMessageSendParams("I accept the terms.");
         string messageReceived = string.Empty;
-        taskManager.OnMessageReceived = (messageSendParams, _) =>
+        taskManager.OnMessageReceived = async (messageSendParams, cancellationToken) =>
         {
             messageReceived = messageSendParams.Message.Parts.OfType<TextPart>().First().Text;
 
-            A2AResponse response = messageReceived switch
+            return messageReceived switch
             {
                 "I need something fancy." => CreateMessage("OK, but it's going to be very expensive."),
-                "I accept the terms." => new AgentTask
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Status = new AgentTaskStatus
-                    {
-                        State = TaskState.Working,
-                        Message = CreateMessage("Working on it!")
-                    },
-                },
+                "I accept the terms." => await taskManager.CreateTaskAsync(cancellationToken: cancellationToken),
                 _ => throw new InvalidOperationException()
             };
-
-            return Task.FromResult(response);
         };
 
-        Assert.IsType<Message>(await taskManager.SendMessageAsync(firstMessage));
-        Assert.IsType<AgentTask>(await taskManager.SendMessageAsync(secondMessage));
+        if (stream)
+        {
+            Assert.IsType<Message>(await taskManager.SendMessageStreamAsync(firstMessage).SingleAsync());
+            Assert.IsType<AgentTask>(await taskManager.SendMessageStreamAsync(secondMessage).SingleAsync());
+        }
+        else
+        {
+            Assert.IsType<Message>(await taskManager.SendMessageAsync(firstMessage));
+            Assert.IsType<AgentTask>(await taskManager.SendMessageAsync(secondMessage));
+        }
     }
 
     [Fact]
