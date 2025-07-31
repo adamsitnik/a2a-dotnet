@@ -20,6 +20,39 @@ public class TaskManagerTests
     }
 
     [Fact]
+    public async Task OnMessageReceivedCanReturnTaskOrMessage()
+    {
+        TaskManager taskManager = new();
+        var firstMessage = CreateMessageSendParams("I need something fancy.");
+        var secondMessage = CreateMessageSendParams("I accept the terms.");
+        string messageReceived = string.Empty;
+        taskManager.OnMessageReceived = (messageSendParams, _) =>
+        {
+            messageReceived = messageSendParams.Message.Parts.OfType<TextPart>().First().Text;
+
+            A2AResponse response = messageReceived switch
+            {
+                "I need something fancy." => CreateMessage("OK, but it's going to be very expensive."),
+                "I accept the terms." => new AgentTask
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Status = new AgentTaskStatus
+                    {
+                        State = TaskState.Working,
+                        Message = CreateMessage("Working on it!")
+                    },
+                },
+                _ => throw new InvalidOperationException()
+            };
+
+            return Task.FromResult(response);
+        };
+
+        Assert.IsType<Message>(await taskManager.SendMessageAsync(firstMessage));
+        Assert.IsType<AgentTask>(await taskManager.SendMessageAsync(secondMessage));
+    }
+
+    [Fact]
     public async Task CreateAndRetrieveTask()
     {
         var taskManager = new TaskManager();

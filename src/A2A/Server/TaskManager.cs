@@ -24,7 +24,7 @@ public sealed class TaskManager : ITaskManager
     private readonly ConcurrentDictionary<string, TaskUpdateEventEnumerator> _taskUpdateEventEnumerators = [];
 
     /// <inheritdoc />
-    public Func<MessageSendParams, CancellationToken, Task<Message>>? OnMessageReceived { get; set; }
+    public Func<MessageSendParams, CancellationToken, Task<A2AResponse>>? OnMessageReceived { get; set; }
 
     /// <inheritdoc />
     public Func<AgentTask, CancellationToken, Task> OnTaskCreated { get; set; } = static (_, _) => Task.CompletedTask;
