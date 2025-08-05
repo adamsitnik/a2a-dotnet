@@ -76,17 +76,19 @@ public static class A2ARouteBuilderExtensions
 
         routeGroup.MapGet(".well-known/agent.json", async (HttpRequest request, CancellationToken cancellationToken) =>
         {
-            const string ActivityName = "GetAgentCard";
-            using var activity = ActivitySource.StartActivity(ActivityName, ActivityKind.Server);
-            var agentUrl = $"{request.Scheme}://{request.Host}{agentPath}";
+            using var activity = ActivitySource.StartActivity("GetAgentCard", ActivityKind.Server);
+
+            UriBuilder uriBuilder = new(request.Scheme, request.Host.Host, request.Host.Port ?? -1, agentPath);
 
             try
             {
-                return Results.Ok(await agentCardProvider.GetAgentCardAsync(agentUrl, cancellationToken));
+                return Results.Ok(await agentCardProvider.GetAgentCardAsync(uriBuilder.ToString(), cancellationToken));
             }
             catch (Exception ex)
             {
-                logger.UnexpectedErrorInActivityName(ex, ActivityName);
+#pragma warning disable CA1848, EA0000 // There are no args to format here so there are no gains from using source generators.
+                logger.LogError(ex, "Unexpected error when fetching AgentCard");
+#pragma warning restore CA1848, EA0000
                 return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         });
